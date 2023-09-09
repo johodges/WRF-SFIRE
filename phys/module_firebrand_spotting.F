@@ -2559,6 +2559,117 @@ END FUNCTION order_val
 
 
 
+        !******************************************************************
+        !******************************************************************
+        !*                                                                *
+        !*                  MPI Receive firebrands                   *
+        !*                                                                *
+        !******************************************************************
+        !******************************************************************
+
+        
+        !===============================================================================            
+        ! MPI: Receive Brands (into this patch)
+        !===============================================================================
+
+
+
+        !-------------------------------------------------------------------------------
+        ! Anything to receive? This part is only needed when compiled in parallel
+        !-------------------------------------------------------------------------------
+
+#if ( defined(DM_PARALLEL)  &&   ! defined(STUBMPI) )
+
+        ALLOCATE(nbr_id(neighbors))
+        nbr_id(:)=0
+        nbr_id(:)=fs_mpi_checkreceive(task_list=task_id, np=neighbors)
+
+        nbr_sum = SUM(nbr_id)
+        IF (nbr_sum > 0) THEN 
+
+            WRITE (msg,'(16(i4,1x))') ([task_id(ii), nbr_id(ii)], ii=1,neighbors)
+            CALL wrf_debug (wrfdbg,  'SPFire_driver mpi_check_receive (taskID, N): '//msg)
+
+            ! Receiving positions, id, dt
+            ALLOCATE(r_x(nbr_sum), r_y(nbr_sum), r_z(nbr_sum), r_id(nbr_sum), r_src(nbr_sum), r_dt(nbr_sum))
+            r_id(:) = 0
+            r_src(:) = 0
+            r_dt(:) = 0
+            r_x(:) = ZERO_dp
+            r_y(:) = ZERO_dp
+            r_z(:) = ZERO_dp
+
+            ! Receiving p_propertieserties
+            ALLOCATE(r_p_m(nbr_sum), r_p_d(nbr_sum), r_p_e(nbr_sum), r_p_t(nbr_sum), r_p_v(nbr_sum))
+            ALLOCATE(fb_mdetv(nbr_sum))
+
+            CALL fs_mpi_recv(np_id=nbr_id, task_id=task_id, &
+                                   r_x=r_x, r_y=r_y, r_z=r_z, &
+                                   r_id=r_id, r_src=r_src, r_dt=r_dt, &
+                                   r_p_m=r_p_m, &
+                                   r_p_d=r_p_d, & 
+                                   r_p_e=r_p_e, &
+                                   r_p_t=r_p_t, & 
+                                   r_p_v=r_p_v)
+
+            ! Assign values to array and release incoming particles
+            !release_mpi_ijk = RESHAPE([r_x,r_y,r_z], [nbr_sum,3])
+            fb_mdetv  = [(p_properties(r_p_m(kk), r_p_d(kk), r_p_e(kk), r_p_t(kk), r_p_v(kk)), kk=1,nbr_sum)]
+
+            ! DO kk=1, nbr_sum
+            !     WRITE(msg,'(3(i6,1x),3(f12.6,1x))') r_id(kk), r_src(kk), r_dt(kk), r_x(kk), r_y(kk), r_z(kk)
+            !     CALL wrf_debug (wrfdbg, 'SPFire_mpi recv AFTER  >>> '// msg)
+            ! ENDDO
+
+            prior_br = active_br + 1 ! Array is packed so new particles will be assgned at this position
+            CALL generate_firebrands(&
+                        fs_p_id = fs_p_id, &
+                        fs_p_src = fs_p_src, &
+                        fs_p_dt = fs_p_dt, &
+                        fs_p_z  = fs_p_z,  &
+                        fs_p_x  = fs_p_x,  &
+                        fs_p_y  = fs_p_y,  &
+                        fs_gen_idmax    = fs_gen_idmax,    &
+                        myprocid = myprocid,        &
+                        active_br   = active_br,   &
+                        release_i = r_x, &
+                        release_j = r_y, &
+                        release_k = r_z, &
+                        release_dt = r_dt, &
+                        release_src = r_src, &
+                        release_prop= fb_mdetv, & 
+                        fs_p_prop   = fs_p_prop)
+
+            WRITE (msg,'(2(i8,1x))') active_br, fs_gen_idmax
+            CALL wrf_debug (wrfdbg, 'SPFire_driver mpi recv AFTER : ii, fs_gen_idmax >>> '// msg)
+
+            fs_p_mass (prior_br:active_br) = r_p_m
+            fs_p_diam (prior_br:active_br) = r_p_d
+            fs_p_effd(prior_br:active_br) = r_p_e
+            fs_p_temp (prior_br:active_br) = r_p_t
+            fs_p_tvel (prior_br:active_br) = r_p_v
+
+            ! DO kk=prior_br,prior_br+MIN(nbr_sum,5)
+            !     WRITE(msg,'(2(i6,1x),6(f12.6,1x))') fs_p_id(kk), fs_p_dt(kk), fs_p_x(kk), fs_p_y(kk), fs_p_z(kk), fs_p_diam(kk), fs_p_temp(kk), fs_p_tvel(kk)
+            !     CALL wrf_debug (wrfdbg, 'SPFire_mpi recv AFTER2  >>> '// msg)
+            ! ENDDO
+
+            DEALLOCATE(r_x, r_y, r_z, r_id, r_src, r_dt)
+            !DEALLOCATE(release_mpi_ijk)
+            DEALLOCATE(fb_mdetv)
+            DEALLOCATE(r_p_m, r_p_d, r_p_e, r_p_t, r_p_v)
+
+        ! ELSE         
+        !     CALL wrf_debug (wrfdbg,  'SPFire_driver mpi nothing to receive')
+        ENDIF
+        DEALLOCATE(nbr_id)
+        !-------------------------------------------------------------------------------
+        ! DONE :)
+        !-------------------------------------------------------------------------------
+#endif
+
+
+
         !===============================================================================
         ! Calculate Spotfire Likelihood at history output time 
         !===============================================================================
@@ -2826,117 +2937,10 @@ END FUNCTION order_val
         ENDIF ! hist_flag
 
         !===============================================================================            
-        !===============================================================================            
-
-
-        !******************************************************************
-        !******************************************************************
-        !*                                                                *
-        !*                  MPI Receive firebrands                   *
-        !*                                                                *
-        !******************************************************************
-        !******************************************************************
-
-        
-        !===============================================================================            
-        ! MPI: Receive Brands (into this patch)
         !===============================================================================
 
 
 
-        !-------------------------------------------------------------------------------
-        ! Anything to receive? This part is only needed when compiled in parallel
-        !-------------------------------------------------------------------------------
-
-#if ( defined(DM_PARALLEL)  &&   ! defined(STUBMPI) )
-
-        ALLOCATE(nbr_id(neighbors))
-        nbr_id(:)=0
-        nbr_id(:)=fs_mpi_checkreceive(task_list=task_id, np=neighbors)
-
-        nbr_sum = SUM(nbr_id)
-        IF (nbr_sum > 0) THEN 
-
-            WRITE (msg,'(16(i4,1x))') ([task_id(ii), nbr_id(ii)], ii=1,neighbors)
-            CALL wrf_debug (wrfdbg,  'SPFire_driver mpi_check_receive (taskID, N): '//msg)
-
-            ! Receiving positions, id, dt
-            ALLOCATE(r_x(nbr_sum), r_y(nbr_sum), r_z(nbr_sum), r_id(nbr_sum), r_src(nbr_sum), r_dt(nbr_sum))
-            r_id(:) = 0
-            r_src(:) = 0
-            r_dt(:) = 0
-            r_x(:) = ZERO_dp
-            r_y(:) = ZERO_dp
-            r_z(:) = ZERO_dp
-
-            ! Receiving p_propertieserties
-            ALLOCATE(r_p_m(nbr_sum), r_p_d(nbr_sum), r_p_e(nbr_sum), r_p_t(nbr_sum), r_p_v(nbr_sum))
-            ALLOCATE(fb_mdetv(nbr_sum))
-
-            CALL fs_mpi_recv(np_id=nbr_id, task_id=task_id, &
-                                   r_x=r_x, r_y=r_y, r_z=r_z, &
-                                   r_id=r_id, r_src=r_src, r_dt=r_dt, &
-                                   r_p_m=r_p_m, &
-                                   r_p_d=r_p_d, & 
-                                   r_p_e=r_p_e, &
-                                   r_p_t=r_p_t, & 
-                                   r_p_v=r_p_v)
-
-            ! Assign values to array and release incoming particles
-            !release_mpi_ijk = RESHAPE([r_x,r_y,r_z], [nbr_sum,3])
-            fb_mdetv  = [(p_properties(r_p_m(kk), r_p_d(kk), r_p_e(kk), r_p_t(kk), r_p_v(kk)), kk=1,nbr_sum)]
-
-            ! DO kk=1, nbr_sum
-            !     WRITE(msg,'(3(i6,1x),3(f12.6,1x))') r_id(kk), r_src(kk), r_dt(kk), r_x(kk), r_y(kk), r_z(kk)
-            !     CALL wrf_debug (wrfdbg, 'SPFire_mpi recv AFTER  >>> '// msg)
-            ! ENDDO
-
-            prior_br = active_br + 1 ! Array is packed so new particles will be assgned at this position
-            CALL generate_firebrands(&
-                        fs_p_id = fs_p_id, &
-                        fs_p_src = fs_p_src, &
-                        fs_p_dt = fs_p_dt, &
-                        fs_p_z  = fs_p_z,  &
-                        fs_p_x  = fs_p_x,  &
-                        fs_p_y  = fs_p_y,  &
-                        fs_gen_idmax    = fs_gen_idmax,    &
-                        myprocid = myprocid,        &
-                        active_br   = active_br,   &
-                        release_i = r_x, &
-                        release_j = r_y, &
-                        release_k = r_z, &
-                        release_dt = r_dt, &
-                        release_src = r_src, &
-                        release_prop= fb_mdetv, & 
-                        fs_p_prop   = fs_p_prop)
-
-            WRITE (msg,'(2(i8,1x))') active_br, fs_gen_idmax
-            CALL wrf_debug (wrfdbg, 'SPFire_driver mpi recv AFTER : ii, fs_gen_idmax >>> '// msg)
-
-            fs_p_mass (prior_br:active_br) = r_p_m
-            fs_p_diam (prior_br:active_br) = r_p_d
-            fs_p_effd(prior_br:active_br) = r_p_e
-            fs_p_temp (prior_br:active_br) = r_p_t
-            fs_p_tvel (prior_br:active_br) = r_p_v
-
-            ! DO kk=prior_br,prior_br+MIN(nbr_sum,5)
-            !     WRITE(msg,'(2(i6,1x),6(f12.6,1x))') fs_p_id(kk), fs_p_dt(kk), fs_p_x(kk), fs_p_y(kk), fs_p_z(kk), fs_p_diam(kk), fs_p_temp(kk), fs_p_tvel(kk)
-            !     CALL wrf_debug (wrfdbg, 'SPFire_mpi recv AFTER2  >>> '// msg)
-            ! ENDDO
-
-            DEALLOCATE(r_x, r_y, r_z, r_id, r_src, r_dt)
-            !DEALLOCATE(release_mpi_ijk)
-            DEALLOCATE(fb_mdetv)
-            DEALLOCATE(r_p_m, r_p_d, r_p_e, r_p_t, r_p_v)
-
-        ! ELSE         
-        !     CALL wrf_debug (wrfdbg,  'SPFire_driver mpi nothing to receive')
-        ENDIF
-        DEALLOCATE(nbr_id)
-        !-------------------------------------------------------------------------------
-        ! DONE :)
-        !-------------------------------------------------------------------------------
-#endif
         !===============================================================================
         ! Check history interval 
         !===============================================================================
