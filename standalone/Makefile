@@ -137,7 +137,7 @@ moisture_main.o: $(MAKEFILE) \
     module_fr_sfire_core.o  \
     module_fr_sfire_util.o 
 
-fire.o: $(MAKEFILE) \
+fire_main.o: $(MAKEFILE) \
     module_fr_sfire_model.o \
     module_fr_sfire_core.o  \
 	module_fr_sfire_driver.o \
