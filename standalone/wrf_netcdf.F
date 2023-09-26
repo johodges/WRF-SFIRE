@@ -66,12 +66,12 @@ character(len=nf90_max_name)::                        &
                               var_fxlat='FXLAT',                &
                               unit_fxlat='',                    &
                               desc_fxlat='',                    &
-                              var_unit_fxlong='UNIT_FXLONG',    &
-                              unit_unit_fxlong='',              &
-                              desc_unit_fxlong='',              &
-                              var_unit_fxlat='UNIT_FXLAT',      &
-                              unit_unit_fxlat='',               &
-                              desc_unit_fxlat='',               &
+                              ! var_unit_fxlong='UNIT_FXLONG',    &
+                              ! unit_unit_fxlong='',              &
+                              ! desc_unit_fxlong='',              &
+                              ! var_unit_fxlat='UNIT_FXLAT',      &
+                              ! unit_unit_fxlat='',               &
+                              ! desc_unit_fxlat='',               &
                               var_uf='UF',                      &
                               unit_uf='',                       &
                               desc_uf='',                       &
@@ -243,8 +243,8 @@ call check(nf90_redef(ncid))
 ! define a timekeeping variable
 call check(nf90_def_var(ncid,var_times,nf90_char,(/strlenid,timeid/),varid))
 ! define scalar variables
-call check(nf90_def_var(ncid,var_unit_fxlong,nf90_float,(/timeid/),varid))
-call check(nf90_def_var(ncid,var_unit_fxlat,nf90_float,(/timeid/),varid))
+! call check(nf90_def_var(ncid,var_unit_fxlong,nf90_float,(/timeid/),varid))
+! call check(nf90_def_var(ncid,var_unit_fxlat,nf90_float,(/timeid/),varid))
 call check(nf90_def_var(ncid,var_xtime,nf90_float,(/timeid/),varid))
 call check(nf90_def_var(ncid,var_itimestep,nf90_int,(/timeid/),varid))
 call check(nf90_enddef(ncid))
@@ -391,8 +391,8 @@ call write_fire_var(ncid,info,iframe,var_ros,grid%ros)
 call write_fire_var(ncid,info,iframe,var_r_0,grid%r_0)
 call write_fire_var(ncid,info,iframe,var_flineint,grid%flineint)
 call write_fire_var(ncid,info,iframe,var_flineint2,grid%flineint2)
-call write_real(ncid,iframe,var_unit_fxlong,grid%unit_fxlong)
-call write_real(ncid,iframe,var_unit_fxlat,grid%unit_fxlat)
+! call write_real(ncid,iframe,var_unit_fxlong,grid%unit_fxlong)
+! call write_real(ncid,iframe,var_unit_fxlat,grid%unit_fxlat)
 call write_fire_var(ncid,info,iframe,var_uf,grid%uf)
 call write_fire_var(ncid,info,iframe,var_vf,grid%vf)
 call write_fire_var(ncid,info,iframe,var_f_ros0,grid%f_ros0)
@@ -832,8 +832,8 @@ call check(nf90_get_var(ncid,varid,info%times,start=(/1,iframe/),count=(/info%le
      'error reading '//trim(var_times))
 if(debug_print_f)write(*,'(2a)')'Time ',info%times
 
-call read_real(ncid,iframe,var_unit_fxlong,grid%unit_fxlong)
-call read_real(ncid,iframe,var_unit_fxlat,grid%unit_fxlat)
+! call read_real(ncid,iframe,var_unit_fxlong,grid%unit_fxlong)
+! call read_real(ncid,iframe,var_unit_fxlat,grid%unit_fxlat)
 call read_fire_var(ncid,info,iframe,var_nfuel_cat,grid%nfuel_cat) 
 call read_fire_var(ncid,info,iframe,var_dzdxf,grid%dzdxf) 
 call read_fire_var(ncid,info,iframe,var_dzdyf,grid%dzdyf) 
