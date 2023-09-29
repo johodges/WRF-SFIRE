@@ -238,7 +238,7 @@ do iframe=iframe_start,iframe_end ! interval ending with iframe
     fmc_g2=grid%fmc_g
   endif
   do istep=1,nsteps
-    itimestep=info%ntimes * (iframe - 1) + istep
+    itimestep=nsteps * (iframe - 1) + istep
     grid%itimestep = itimestep
     grid%xtime = itimestep * grid%dt / 60.
     id=itimestep
